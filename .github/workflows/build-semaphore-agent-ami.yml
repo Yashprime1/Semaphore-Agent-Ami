@@ -32,6 +32,7 @@ jobs:
       - name: Build default agent AMI
         id: build_default_ami
         run: |
+          set -eo pipefail
           make packer.init
           make packer.build.linux INSTALL_ERLANG=false AMI_INSTANCE_TYPE=t2.micro AMI_ARCH=x86_64 AWS_REGION=${{ github.event.inputs.Region || 'eu-west-1' }} AMI_PREFIX=semaphore-agent-${{ github.run_id }} TOOLBOX_VERSION=v1.26.0 | tee packer_output.log
         env:
@@ -41,6 +42,7 @@ jobs:
 
       - name: Get default AMI ID
         id: get_ami_id
+        if: always()
         run: |
           AMI_ID=$(grep -oP 'ami-[a-z0-9]+' packer_output.log | tail -1)
           echo "ami_id=$AMI_ID" >> $GITHUB_OUTPUT
@@ -62,6 +64,7 @@ jobs:
       - name: Build both agent variants (with-tools, with-tools-ultron)
         id: build_variants
         run: |
+          set -eo pipefail
           packer init semaphore-agent-ami/packer-semaphore-agent-variant.pkr.hcl
           packer build -var "default_agent_ami=${{ needs.build-default-semaphore-agent-ami.outputs.default_ami_id }}" -var "aws_region=${{ github.event.inputs.Region }}" -var "iam_instance_profile=${{ github.event.inputs.iam_instance_profile }}" semaphore-agent-ami/packer-semaphore-agent-variant.pkr.hcl | tee packer_variants_output.log
         env:
@@ -71,6 +74,7 @@ jobs:
 
 
       - name: Output AMI IDs 
+        if: always()
         run: |
           echo "with-tools AMI: $(grep -A1 'with-tools\.amazon-ebs\.with-tools:' packer_variants_output.log | tail -1 | awk '{print $2}')"
           echo "with-tools-ultron AMI: $(grep -A1 'with-tools-ultron\.amazon-ebs\.with-tools-ultron:' packer_variants_output.log | tail -1 | awk '{print $2}')"
