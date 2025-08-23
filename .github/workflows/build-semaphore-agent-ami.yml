@@ -1,4 +1,4 @@
-name: Build-Semaphore-Agent-Variants
+name: Build-Semaphore-Agent-Ami
 
 on:
   workflow_dispatch:
