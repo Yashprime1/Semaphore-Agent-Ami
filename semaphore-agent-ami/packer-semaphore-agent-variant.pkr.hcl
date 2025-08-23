@@ -8,9 +8,14 @@ variable "aws_region" {
   default = "eu-west-1"
 }
 
+variable "iam_instance_profile" {
+  type    = string
+}
+
 source "amazon-ebs" "with-tools" {
   ami_name      = "semaphore-agent-with-tools-{{timestamp}}"
   instance_type = "t2.micro"
+  iam_instance_profile = var.iam_instance_profile
   region        = var.aws_region
   source_ami    = var.default_agent_ami
   ssh_username  = "ubuntu"
@@ -27,6 +32,7 @@ source "amazon-ebs" "with-tools" {
 source "amazon-ebs" "with-tools-ultron" {
   ami_name      = "semaphore-agent-with-tools-ultron-{{timestamp}}"
   instance_type = "t2.micro"
+  iam_instance_profile = var.iam_instance_profile
   region        = var.aws_region
   source_ami    = var.default_agent_ami
   ssh_username  = "ubuntu"

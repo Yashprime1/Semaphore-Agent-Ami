@@ -17,7 +17,7 @@ jobs:
       - name: Checkout agent-aws-stack repo
         uses: actions/checkout@v4
         with:
-          repository: CleverTap-SNE/agent-aws-stack
+          repository: Yashprime1/agent-aws-stack
           show-progress: 'false'
 
       - name: Setup packer
@@ -63,7 +63,7 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.BUILD_AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.BUILD_AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ github.event.inputs.Region || 'eu-west-1' }}
+          AWS_DEFAULT_REGION: ${{ github.event.inputs.Region }}
 
       - name: Output AMI IDs 
         run: |
