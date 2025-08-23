@@ -14,6 +14,28 @@ error_handler() {
 # Set up error handling
 trap 'error_handler ${LINENO} "$BASH_COMMAND"' ERR
 
+
+# Install AWS CLI
+python3 -m venv prod-venv
+source prod-venv/bin/activate
+pip3 install awscli --upgrade
+deactivate
+
+# Get instance metadata
+TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+instance_id=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/instance-id)
+security_group_id=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/security-groups | cut -d ' ' -f 1)
+key_pair_name=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/public-keys/0/openssh-key | cut -d ' ' -f 3)
+region=$(curl -H "X-aws-ec2-metadata-token: $TOKEN" -s http://169.254.169.254/latest/meta-data/placement/region)
+
+
+# Add tags to the packer instance
+aws ec2 create-tags --resources $instance_id --region $region --tags \
+  Key=packer-name,Value=semaphore-agent-ami-builder \
+  Key=instance-id,Value=$instance_id \
+  Key=security-group,Value=$security_group_id \
+  Key=key-pair,Value=$key_pair_name
+
 echo "Installing build dependencies"
 
 export JAVA_VERSION_MAJOR=8
@@ -41,12 +63,6 @@ apt-get -o DPkg::Lock::Timeout=300 install -y libgbm-dev libxcomposite-dev libxr
 
 # Install build tools and development libraries
 apt-get -o DPkg::Lock::Timeout=300 install -y build-essential autoconf libtool
-
-# Install AWS CLI
-python3 -m venv prod-venv
-source prod-venv/bin/activate
-pip3 install awscli --upgrade
-deactivate
 
 # Install Java versions
 wget https://corretto.aws/downloads/resources/${JAVA_VERSION_MAJOR}.${JAVA_VERSION_MINOR}.${JAVA_VERSION_BUILD}/amazon-corretto-${JAVA_VERSION_MAJOR}.${JAVA_VERSION_MINOR}.${JAVA_VERSION_BUILD}-linux-x64.tar.gz >> /dev/null  \
@@ -109,16 +125,9 @@ touch /etc/profile.d/semaphore.sh
 chmod 644 /etc/profile.d/semaphore.sh
 
 # Set Java and Maven environment variables
-echo "export JAVA_HOME=/opt/amazon-corretto-8.332.08.1-linux-x64" > /etc/profile.d/semaphore.sh
+echo "export JAVA_HOME=/opt/amazon-corretto-8.332.08.1-linux-x64" >> /etc/profile.d/semaphore.sh
 echo "export M2_HOME=/opt/apache-maven-3.9.4" >> /etc/profile.d/semaphore.sh
 echo "export MAVEN_HOME=/opt/apache-maven-3.9.4" >> /etc/profile.d/semaphore.sh
-echo "Fix semaphore agent heap size(XMX)"
-if [ -f "/opt/semaphore-agent/bin/semaphore-agent" ]; then
-  sed -i 's@.*MARKER.*@sed -i "s/-Xmx256m/-Xmx1g/" $startupScript@' /opt/semaphore-agent/bin/semaphore-agent
-else
-  echo "Warning: semaphore-agent not found at /opt/semaphore-agent/bin/semaphore-agent"
-fi
-
 echo 'export PATH=/opt/amazon-corretto-11.0.19.7.1-linux-x64/bin:/opt/apache-maven-3.9.4/bin:$PATH' >> /etc/profile.d/semaphore.sh
 
 echo "fs.file-max=1000000" >> /etc/sysctl.conf
@@ -130,4 +139,4 @@ echo "semaphore           hard    nofile          900000" >> /etc/security/limit
 mkdir -p /home/semaphore/semaphore-agent-home/logs
 chown -R semaphore:users /home/semaphore/semaphore-agent-home
 
-echo "Ultron bootstrap completed successfully!"
+echo "Ultron ami bootstrap completed successfully!"
