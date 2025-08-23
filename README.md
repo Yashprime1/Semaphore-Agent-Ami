@@ -1,0 +1,1 @@
+This is for the ami setup of semaphore agents
