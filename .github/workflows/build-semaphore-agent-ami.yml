@@ -78,3 +78,34 @@ jobs:
         run: |
           echo "with-tools AMI: $(grep -A1 'with-tools\.amazon-ebs\.with-tools:' packer_variants_output.log | tail -1 | awk '{print $2}')"
           echo "with-tools-ultron AMI: $(grep -A1 'with-tools-ultron\.amazon-ebs\.with-tools-ultron:' packer_variants_output.log | tail -1 | awk '{print $2}')"
+
+
+  cleanup-elastic-agent-packer-resources:
+    needs: build-variants
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cleanup Elastic agent packer resources
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.BUILD_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BUILD_AWS_SECRET_ACCESS_KEY }}
+        run: |
+          echo "will terminate the resources here..."
+          instance_ids=$(aws ec2 describe-instances --region  eu-west-1 --filters "Name=tag:packer-name,Values=semaphore-agent-ami-builder" "Name=instance-state-name,Values=running" --query "Reservations[*].Instances[*].InstanceId" --output text)
+          for instance_id in $instance_ids; do
+            echo "Processing instance ID: $instance_id"
+            values=$(aws ec2 describe-tags --region eu-west-1 --filters "Name=resource-id,Values=$instance_id" --query "Tags[?Key=='instance-id' || Key=='security-group' || Key=='key-pair'].Value" --output text)
+            if [ -n "$values" ]; then
+              echo "Values are not empty: $values"
+              aws ec2 terminate-instances --instance-ids "$instance_id" --region eu-west-1
+              aws ec2 wait instance-terminated --instance-ids "$instance_id" --region eu-west-1
+              key_pair_name=$(echo "$values" | awk '{print $2}')
+              aws ec2 delete-key-pair --key-name $key_pair_name --region eu-west-1
+              sg_name=$(echo "$values" | awk '{print $3}')
+              security_group_id=$(aws ec2 describe-security-groups --region eu-west-1 --filters "Name=group-name,Values=$sg_name" --query "SecurityGroups[0].GroupId" --output text)
+              aws ec2 delete-security-group --group-id "$security_group_id" --region eu-west-1
+              echo "terminated"
+            else
+              echo "Values are empty or not found."
+            fi
+          done
+          echo "Script completed."
