@@ -13,8 +13,8 @@ error_handler() {
 
 # Set up error handling
 trap 'error_handler ${LINENO} "$BASH_COMMAND"' ERR
-
-
+apt-get update
+apt-get install -y python3-venv
 # Install AWS CLI
 python3 -m venv prod-venv
 source prod-venv/bin/activate
