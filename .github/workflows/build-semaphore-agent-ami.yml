@@ -69,6 +69,8 @@ jobs:
           packer build -var "default_agent_ami=${{ needs.build-default-semaphore-agent-ami.outputs.default_ami_id }}" -var "aws_region=${{ github.event.inputs.Region }}" -var "iam_instance_profile=${{ github.event.inputs.iam_instance_profile }}" semaphore-agent-ami/packer-semaphore-agent-variant.pkr.hcl | tee packer_variants_output.log
         env:
           AWS_DEFAULT_REGION: ${{ github.event.inputs.Region }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.BUILD_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BUILD_AWS_SECRET_ACCESS_KEY }}
 
 
       - name: Output AMI IDs 
