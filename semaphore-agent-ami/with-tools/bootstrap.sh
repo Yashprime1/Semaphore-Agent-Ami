@@ -16,6 +16,8 @@ error_handler() {
 trap 'error_handler ${LINENO} "$BASH_COMMAND"' ERR
 
 # Install AWS CLI
+apt-get update
+apt-get install -y python3-venv
 python3 -m venv prod-venv
 source prod-venv/bin/activate
 pip3 install awscli --upgrade
