@@ -23,7 +23,7 @@ jobs:
         with:
           repository: renderedtext/agent-aws-stack
           show-progress: 'false'
-          ref: 'v0.9.0'
+          ref: 'v0.9.1'
 
 
       - name: Setup packer
@@ -36,7 +36,7 @@ jobs:
         run: |
           set -eo pipefail
           make packer.init
-          make packer.build.linux INSTALL_ERLANG=false AMI_INSTANCE_TYPE=t2.micro AMI_ARCH=x86_64 AWS_REGION=${{ github.event.inputs.Region || 'eu-west-1' }} AMI_PREFIX=semaphore-agent-${{ github.run_id }} TOOLBOX_VERSION=v1.26.0 SOURCE_AMI=ami-0416cbe3c21834f41 UBUNTU_VERSION=noble | tee packer_output.log
+          make packer.build.linux INSTALL_ERLANG=false AMI_INSTANCE_TYPE=t2.micro AMI_ARCH=x86_64 AWS_REGION=${{ github.event.inputs.Region || 'eu-west-1' }} AMI_PREFIX=semaphore-agent-${{ github.run_id }} TOOLBOX_VERSION=v1.26.0 SOURCE_AMI=ami-0416cbe3c21834f41 UBUNTU_VERSION=noble APT_HOLD_PATTERNS=linux-image*,linux-headers* | tee packer_output.log
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.BUILD_AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.BUILD_AWS_SECRET_ACCESS_KEY }}
