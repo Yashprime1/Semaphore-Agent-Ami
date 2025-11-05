@@ -105,17 +105,13 @@ jobs:
     steps:
       - name: Copy AMIs to target regions
         run: |
-          echo "${{ needs.build-default-semaphore-agent-ami.outputs.default_ami_id }}" > default-ami.txt
-          echo "${{ needs.build-variants.outputs.with_tools_ami_id }}" > with-tools-ami.txt
-          echo "${{ needs.build-variants.outputs.with_tools_ultron_ami_id }}" > with-tools-ultron-ami.txt
-          
-          for ami_file in default-ami.txt with-tools-ami.txt with-tools-ultron-ami.txt
-          do
+          echo "${{ needs.build-default-semaphore-agent-ami.outputs.default_ami_id }}" > default-ami.txt && echo "${{ needs.build-variants.outputs.with_tools_ami_id }}" > with-tools-ami.txt && echo "${{ needs.build-variants.outputs.with_tools_ultron_ami_id }}" > with-tools-ultron-ami.txt
+          for ami_file in default-ami.txt with-tools-ami.txt with-tools-ultron-ami.txt; do
+            ami_label=$(echo $ami_file | sed 's/-ami.txt//')
             ami_details=$(aws ec2 describe-images --image-ids $(cat $ami_file) --output json --region ${{ github.event.inputs.Region }})
-            echo "${{ github.event.inputs.Region }} - \"$(cat $ami_file)\""
-            for region in $(echo "${{ github.event.inputs.target_regions }}" | tr ',' ' ')
-            do
-              echo "$region - $(aws ec2 copy-image --name "$(echo "$ami_details" | jq -r '.Images[0].Name')" --source-image-id "$(cat $ami_file)" --description "$(echo "$ami_details" | jq -r '.Images[0].Description')" --source-region ${{ github.event.inputs.Region }} --region $region --output json --query 'ImageId')"
+            echo "" && echo "$ami_label" && echo "${{ github.event.inputs.Region }} - \"$(cat $ami_file)\""
+            for region in $(echo "${{ github.event.inputs.target_regions }}" | tr ',' ' '); do
+              echo "$region - \"$(aws ec2 copy-image --name "$(echo "$ami_details" | jq -r '.Images[0].Name')" --source-image-id "$(cat $ami_file)" --description "$(echo "$ami_details" | jq -r '.Images[0].Description')" --source-region ${{ github.event.inputs.Region }} --region $region --output text --query 'ImageId')\""
             done
           done
         env:
