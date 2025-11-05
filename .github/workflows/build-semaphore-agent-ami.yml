@@ -11,6 +11,10 @@ on:
         description: "IAM Instance Profile"
         required: false
         default: "System-SharedResources-PackerEc2InstanceIamProfile-sTs5SePHjF83"
+      target_regions:
+        description: "Comma-separated list of regions to copy AMIs to (e.g., us-east-1,us-west-2)"
+        required: false
+        default: "us-east-1"
 
 jobs:
   build-default-semaphore-agent-ami:
@@ -52,6 +56,9 @@ jobs:
   build-variants:
     needs: build-default-semaphore-agent-ami
     runs-on: ubuntu-latest
+    outputs:
+      with_tools_ami_id: ${{ steps.get_ami_ids.outputs.with_tools_ami_id }}
+      with_tools_ultron_ami_id: ${{ steps.get_ami_ids.outputs.with_tools_ultron_ami_id }}
     steps:
       - name: Checkout this repo
         uses: actions/checkout@v4
@@ -75,12 +82,46 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.BUILD_AWS_SECRET_ACCESS_KEY }}
 
 
-      - name: Output AMI IDs 
-        if: always()
+      - name: Get AMI IDs
+        id: get_ami_ids
         run: |
-          echo "with-tools AMI: $(grep -A1 'with-tools\.amazon-ebs\.with-tools:' packer_variants_output.log | tail -1 | awk '{print $2}')"
-          echo "with-tools-ultron AMI: $(grep -A1 'with-tools-ultron\.amazon-ebs\.with-tools-ultron:' packer_variants_output.log | tail -1 | awk '{print $2}')"
+          WITH_TOOLS_AMI=$(grep -A1 'with-tools\.amazon-ebs\.with-tools:' packer_variants_output.log | tail -1 | awk '{print $2}')
+          WITH_TOOLS_ULTRON_AMI=$(grep -A1 'with-tools-ultron\.amazon-ebs\.with-tools-ultron:' packer_variants_output.log | tail -1 | awk '{print $2}')
+          echo "with-tools AMI: $WITH_TOOLS_AMI"
+          echo "with-tools-ultron AMI: $WITH_TOOLS_ULTRON_AMI"
+          echo "with_tools_ami_id=$WITH_TOOLS_AMI" >> $GITHUB_OUTPUT
+          echo "with_tools_ultron_ami_id=$WITH_TOOLS_ULTRON_AMI" >> $GITHUB_OUTPUT
 
+      - name: Output AMI IDs 
+        run: |
+          echo "with-tools AMI: ${{ steps.get_ami_ids.outputs.with_tools_ami_id }}"
+          echo "with-tools-ultron AMI: ${{ steps.get_ami_ids.outputs.with_tools_ultron_ami_id }}"
+
+
+  copy-amis-to-regions:
+    needs: [build-default-semaphore-agent-ami, build-variants]
+    if: ${{ github.event.inputs.target_regions != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Copy AMIs to target regions
+        run: |
+          echo "${{ needs.build-default-semaphore-agent-ami.outputs.default_ami_id }}" > default-ami.txt
+          echo "${{ needs.build-variants.outputs.with_tools_ami_id }}" > with-tools-ami.txt
+          echo "${{ needs.build-variants.outputs.with_tools_ultron_ami_id }}" > with-tools-ultron-ami.txt
+          
+          for ami_file in default-ami.txt with-tools-ami.txt with-tools-ultron-ami.txt
+          do
+            ami_details=$(aws ec2 describe-images --image-ids $(cat $ami_file) --output json --region ${{ github.event.inputs.Region }})
+            echo "${{ github.event.inputs.Region }} - \"$(cat $ami_file)\""
+            for region in $(echo "${{ github.event.inputs.target_regions }}" | tr ',' ' ')
+            do
+              echo "$region - $(aws ec2 copy-image --name "$(echo "$ami_details" | jq -r '.Images[0].Name')" --source-image-id "$(cat $ami_file)" --description "$(echo "$ami_details" | jq -r '.Images[0].Description')" --source-region ${{ github.event.inputs.Region }} --region $region --output json --query 'ImageId')"
+            done
+          done
+        env:
+          AWS_DEFAULT_REGION: ${{ github.event.inputs.Region }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.BUILD_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BUILD_AWS_SECRET_ACCESS_KEY }}
 
   cleanup-elastic-agent-packer-resources:
     needs: build-variants
