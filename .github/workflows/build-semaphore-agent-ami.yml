@@ -25,9 +25,9 @@ jobs:
       - name: Checkout agent-aws-stack repo
         uses: actions/checkout@v4
         with:
-          repository: renderedtext/agent-aws-stack
+          repository: Yashprime1/agent-aws-stack
           show-progress: 'false'
-          ref: 'v0.9.1'
+          ref: 'handle-downscale-via-lambda'
 
 
       - name: Setup packer
